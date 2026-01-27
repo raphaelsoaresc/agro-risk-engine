@@ -1,0 +1,14 @@
+pandas
+numpy
+yfinance
+requests
+httpx
+pydantic
+fastapi
+uvicorn
+supabase
+pyyaml
+python-dotenv
+feedparser
+scipy
+openpyxl

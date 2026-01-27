@@ -1,0 +1,163 @@
+# ==============================================================================
+# 🌾 Agro Risk Engine - Data Pipeline CONFIGURATION (UNIFIED)
+# ==============================================================================
+project_name: "Agro Risk Engine - Data Pipeline"
+version: "2.6.0"
+
+# --- 1. Market Data (Ativos) ---
+tickers:
+  - "ZS=F"        # Soja Chicago (Contrato Atual/Próximo)
+  - "ZC=F"        # Milho Chicago
+  - "ZW=F"        # Trigo Chicago
+  - "KE=F"        # Trigo Kansas
+  - "USDBRL=X"    # Dólar
+  - "CL=F"        # Petróleo WTI
+  - "GC=F"        # Ouro
+  - "BDRY"        # Baltic Dry Index
+  - "NG=F"        # Gás Natural (Proxy de Fertilizante Nitrogenado)
+  - "NTR"         # Nutrien Ltd (Ações de Fertilizantes)
+  - "MOS"         # Mosaic Co (Proxy de Fosfatos)
+  - "HE=F"        # Lean Hogs (Carne Suína - Proxy Demanda China)
+  - "ZM=F"        # Soybean Meal (Farelo)
+  - "ZL=F"        # Soybean Oil (Óleo)
+
+ticker_map:
+  "ZS=F": "Soja_Chicago"
+  "ZC=F": "Milho_Chicago"
+  "ZW=F": "Trigo_Chicago"
+  "KE=F": "Trigo_Kansas"
+  "USDBRL=X": "Dolar_BRL"
+  "CL=F": "Petroleo_WTI"
+  "GC=F": "Ouro_Risco"
+  "BDRY": "Frete_Maritimo"
+  "NG=F": "Gas_Natural"
+  "NTR": "Acao_Nutrien"
+  "MOS": "Acao_Mosaic"
+  "HE=F": "Carne_Suina"
+  "ZM=F": "Farelo_soja"
+  "ZL=F": "Oleo_soja"
+
+# --- 2. Parâmetros de Risco ---
+risk_thresholds:
+  rsi_overbought: 70
+  rsi_oversold: 30
+  diesel_alert: 25
+  basis_vol_multiplier: 2.0 
+  logistics_peak_multiplier: 1.5 
+  fertilizer_spread_alert: 20 
+
+# --- 3. Pontos de Monitoramento Estratégico ---
+locations:
+  # --- BRASIL CENTRO-OESTE ---
+  - name: "Sorriso_MT"
+    state_code: "MT"
+    dist_to_port: 1500  # Distância crítica para regra do Diesel
+    group: "BR"
+    cluster: "BR_CENTER_WEST"
+    lat: -12.54
+    lon: -55.72
+  - name: "Rio_Verde_GO"
+    state_code: "GO"
+    dist_to_port: 900
+    group: "BR"
+    cluster: "BR_CENTER_WEST"
+    lat: -17.79
+    lon: -50.92
+
+  # --- BRASIL SUL (LOGÍSTICA) ---
+  - name: "Cascavel_PR"
+    state_code: "PR"
+    dist_to_port: 500
+    group: "BR"
+    cluster: "BR_SOUTH"
+    lat: -24.95
+    lon: -53.45
+  - name: "Paranagua"
+    state_code: "PR"
+    dist_to_port: 0
+    group: "BR"
+    cluster: "BR_SOUTH"
+    lat: -25.50
+    lon: -48.50
+  - name: "Porto_Santos"
+    state_code: "SP"
+    dist_to_port: 0
+    group: "BR"
+    cluster: "BR_SOUTH"
+    lat: -23.96
+    lon: -46.33
+
+  # --- ARCO NORTE ---
+  - name: "Itaqui_MA"
+    group: "BR"
+    cluster: "BR_NORTH_ARC"
+    lat: -2.57
+    lon: -44.36
+  - name: "Itacoatiara_AM"
+    group: "BR"
+    cluster: "BR_NORTH_ARC"
+    lat: -3.14
+    lon: -58.44
+  - name: "Santarem_PA"
+    group: "BR"
+    cluster: "BR_NORTH_ARC"
+    lat: -2.44
+    lon: -54.70
+
+  # --- USA CORN BELT ---
+  - name: "Des_Moines_IA"
+    group: "US"
+    cluster: "US_CORN_BELT"
+    lat: 41.60
+    lon: -93.60
+  - name: "Decatur_IL"
+    group: "US"
+    cluster: "US_CORN_BELT"
+    lat: 39.84
+    lon: -88.95
+  - name: "Mississippi_River_St_Louis"
+    group: "US"
+    cluster: "US_CORN_BELT"
+    lat: 38.62
+    lon: -90.19
+
+  # --- GLOBAL CHOKEPOINTS ---
+  - name: "Panama_Canal"
+    group: "GLOBAL"
+    cluster: "GLOBAL_CHOKEPOINTS"
+    lat: 9.08
+    lon: -79.68
+  - name: "Suez_Canal"
+    group: "GLOBAL"
+    cluster: "GLOBAL_CHOKEPOINTS"
+    lat: 30.58
+    lon: 32.27
+  - name: "China_Dalian"
+    group: "GLOBAL"
+    cluster: "GLOBAL_CHOKEPOINTS"
+    lat: 38.91
+    lon: 121.60
+
+# --- 4. Janelas Operacionais ---
+windows:
+  morning: [6, 9]
+  market: [11, 14]
+  logistics: [15, 17]
+  closing: [18, 20]
+
+# Mapeamento de Fontes de Dados (Data Routing)
+market_sources:
+  default: "yahoo"
+  overrides:
+    "USDBRL=X": "brapi"
+    "RAIL3": "brapi"
+    "STBP3": "brapi"
+    "PETR4": "brapi"
+
+# Mapeamento de Tickers (Sistema Interno -> API Externa)
+ticker_translation:
+  brapi:
+    "USDBRL=X": "USD-BRL" # Brapi usa traço
+    "RAIL3": "RAIL3"
+  yahoo:
+    "ZS=F": "ZS=F"
