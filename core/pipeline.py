@@ -50,6 +50,17 @@ class RiskPipeline:
     def run(self):
         logger.info(f"🚀 Iniciando Credit Risk Pipeline")
         
+        # --- CORREÇÃO: Executar o Scout antes de processar contratos ---
+        # Como o fetch_and_store é async, e o run é sync, precisamos rodar via asyncio.run
+        # ou transformar o run em async. Para manter simples aqui:
+        import asyncio
+        try:
+            logger.info("🕵️ Executando Scout de Notícias (IA)...")
+            asyncio.run(self.scout.fetch_and_store())
+        except Exception as e:
+            logger.error(f"⚠️ Falha no Scout de Notícias (não bloqueante): {e}")
+        # ---------------------------------------------------------------
+        
         response = self.db.client.table("credit_portfolio").select("*").execute()
         self.contracts = response.data or []
         
@@ -115,29 +126,31 @@ class RiskPipeline:
             logger.error(f"Erro no benchmark: {e}")
             return 30.0
 
-    def _process_contracts(self):  # Renomeado de _process_regions
+    def _process_contracts(self):
+        logger.info(f"🔄 Processando {len(self.contracts)} contratos...")
+        updates = []
         current_month = self.now_br.month
 
         for raw_contract in self.contracts:
             try:
-                # 1. Mapeamento de Dados do Contrato
+                # 1. Mapeamento de Dados
                 contract = {
                     "id": raw_contract.get("id"),
                     "name": raw_contract.get("client_name"),
-                    "state_code": raw_contract.get("state_code", "MT"), # UF vinda do DB
+                    "state_code": raw_contract.get("state_code", "MT"),
                     "loan_amount": raw_contract.get("loan_amount", 0),
                     "area_hectares": raw_contract.get("area_hectares", 0),
-                    "estimated_yield_kg_ha": raw_contract.get("estimated_yield_kg_ha", 3600), # Default 60 sacas/ha
-                    "commodity": (raw_contract.get("culture") or "soja").lower()
+                    "estimated_yield_kg_ha": raw_contract.get("estimated_yield_kg_ha", 3600),
+                    "commodity": (raw_contract.get("culture") or "soja").lower(),
+                    # --- FIX: Mantemos lat/lon para o upsert não quebrar ---
+                    "latitude": raw_contract.get("latitude"),
+                    "longitude": raw_contract.get("longitude")
                 }
 
-                # 2. Execução do Motor de PD/LTV
+                # 2. Execução do Motor
                 strategy = RegionalEngineFactory.get_strategy(raw_contract)
-                
-                # Preço atual para o cálculo de LTV
                 current_price_brl = strategy.get_soy_brl_price(self.df_market)
                 
-                # Cálculo de PD (Probability of Default)
                 pd_score, metrics = self.engine.calculate_pd_metrics(
                     self.df_market, 
                     contract['name'], 
@@ -147,31 +160,44 @@ class RiskPipeline:
                 )
                 
                 metrics['market_price_brl'] = current_price_brl
-
-                # 1. Gera a justificativa (Explainability)
                 risk_justification = self.advisor.generate_credit_narrative(pd_score, metrics)
-                metrics['risk_justification'] = risk_justification
 
-                # 2. Atualiza o Contexto Global de Carteira
+                # 3. Atualiza Contexto em Memória
                 self.context.update_portfolio_metrics(
                     pd_score, 
                     contract['loan_amount'], 
                     metrics.get('collateral_status')
                 )
 
-                # 3. Persiste no Banco com a Justificativa
-                self.db.client.table("credit_portfolio").update({
+                # 4. Prepara o Objeto para Salvar (CORREÇÃO AQUI)
+                # O upsert precisa dos campos obrigatórios (lat/lon) mesmo que não tenham mudado
+                record_to_save = {
+                    "id": contract['id'],
+                    "client_name": contract['name'], # Importante manter
+                    "latitude": contract['latitude'], # <--- OBRIGATÓRIO
+                    "longitude": contract['longitude'], # <--- OBRIGATÓRIO
+                    "state_code": contract['state_code'],
                     "last_pd_score": pd_score,
                     "current_ltv": metrics.get('ltv'),
                     "collateral_status": metrics.get('collateral_status'),
-                    "risk_justification": risk_justification # <--- NOVA COLUNA
-                }).eq("id", contract['id']).execute()
+                    "risk_justification": risk_justification
+                }
+                updates.append(record_to_save)
 
             except Exception as e:
                 # Agora o logger estará definido aqui
                 logger.error(f"❌ Erro Crítico no Contrato {raw_contract.get('id')}: {e}")
 
-        # Salva métricas globais após o loop
+        # Salva TUDO de uma vez fora do loop
+        if updates:
+            logger.info(f"💾 Salvando {len(updates)} contratos em lote...")
+            try:
+                self.db.client.table("credit_portfolio").upsert(updates).execute()
+                logger.info("✅ Lote salvo com sucesso!")
+            except Exception as e:
+                logger.critical(f"❌ Falha ao salvar lote no banco: {e}")
+
+        # Salva métricas globais
         self.persister.save_market_metrics(self.df_market, self.context)
 
     def _load_data(self) -> bool:
