@@ -1,4 +1,4 @@
-```
+```markdown
 # Agro Risk Engine (Enterprise Core) 🚜
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
@@ -113,10 +113,14 @@ Este projeto utiliza ferramentas modernas. Certifique-se de ter o [uv](https://d
 3.  **Instalação de Dependências:**
     Utilizando o `pyproject.toml` para gerenciar o ambiente:
     ```bash
-    # Instala o projeto em modo editável
-    uv pip install -e .
-    
-    # Ou para incluir ferramentas de dev (testes/linting):
+    # 1. Cria o ambiente virtual
+    uv venv
+
+    # 2. Ativa o ambiente (Linux/Mac)
+    source .venv/bin/activate
+    # (No Windows use: .venv\Scripts\activate)
+
+    # 3. Instala o projeto em modo editável com dependências de dev
     uv pip install -e ".[dev]"
     ```
 
