@@ -9,7 +9,6 @@ authors = [
 ]
 license = { text = "MIT" }
 
-# Dependências de Produção
 dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
@@ -27,19 +26,22 @@ dependencies = [
     "openpyxl>=3.1.0"
 ]
 
-# Dependências de Desenvolvimento (Testes, Linting)
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
-    "ruff>=0.1.0",  # Linter rápido (substituto do flake8/black)
-    "mypy>=1.5.0"   # Checagem de tipos estática
+    "ruff>=0.1.0",
+    "mypy>=1.5.0"
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Configurações de Ferramentas (Centralizando configs aqui)
+# --- CORREÇÃO AQUI EMBAIXO ---
+# Dizemos ao Hatchling quais pastas compõem o pacote
+[tool.hatch.build.targets.wheel]
+packages = ["core", "flow", "scripts"]
+
 [tool.pytest.ini_options]
 pythonpath = "."
 addopts = "-v"
