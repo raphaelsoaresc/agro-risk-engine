@@ -1,8 +1,10 @@
+```
 # Agro Risk Engine (Enterprise Core) 🚜
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
 ![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith-green?style=for-the-badge)
-![CI Status](https://img.shields.io/github/actions/workflow/status/SEU_USUARIO/agro-risk-engine/ci.yml?style=for-the-badge&label=Build)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![CI Status](https://img.shields.io/github/actions/workflow/status/raphaelsoaresc/agro-risk-engine/ci.yml?style=for-the-badge&label=Build)
 
 **Motor de Modelagem de Risco de Crédito Agrícola (Credit Risk Engine) de alta performance.**
 
@@ -17,6 +19,7 @@ Este motor implementa uma análise multidimensional em tempo real, correlacionan
 1.  **Mercado Global (CBOT):** Volatilidade de preços e paridade de exportação.
 2.  **Logística Local:** Custo de frete e gargalos portuários (Risco de Base).
 3.  **Climatologia:** Impacto de anomalias hídricas na produtividade da safra.
+4.  **Geopolítica (IA):** Monitoramento de cisnes negros em cadeias de suprimento globais.
 
 O resultado é um **PD (Probability of Default) Dinâmico**, capaz de prever crises de liquidez antes do vencimento dos contratos.
 
@@ -31,6 +34,11 @@ graph TD
     A[Fontes Externas] -->|Async HTTP / Retry| B(Ingestion Layer)
     B -->|Dados Normalizados| C{Risk Pipeline}
     
+    subgraph Intelligence Layer
+    X[RSS Feeds / News] -->|NLP Zero-Shot| Y[AI Scout Agent]
+    Y -->|Alertas Qualitativos| H
+    end
+
     subgraph Core Engine
     C --> D[Strategy Factory]
     D --> E[Mato Grosso Strategy]
@@ -75,13 +83,26 @@ O risco climático é ponderado pelo calendário agrícola.
 *   **Crush Margin:** Viabilidade da indústria esmagadora.
 *   **Efeito Tesoura:** Relação de troca entre Receita (Soja) e Custo (Insumos/Petróleo).
 
+## 🤖 Camada de Inteligência (AI & NLP)
+
+O sistema possui um agente autônomo (`core/scout.py`) para análise de risco geopolítico:
+*   **Monitoramento OSINT:** Varredura contínua de feeds globais (Reuters, Google News).
+*   **Zero-Shot Classification (BART):** Utiliza LLMs via Hugging Face para classificar notícias em tempo real (ex: "Crise Logística", "Desastre Climático") sem necessidade de treinamento prévio.
+
+## 📉 Backtesting Institucional
+
+Diferente de projetos acadêmicos, este motor possui um framework de validação temporal (`core/backtest_engine.py`) que:
+*   **Walk-Forward Analysis:** Simula a execução do modelo mês a mês sobre safras passadas.
+*   **Point-in-Time Data:** Garante que o modelo "não veja o futuro" (Look-ahead Bias), usando apenas dados disponíveis na data da simulação.
+*   **Métricas de Risco:** Calcula *Expected Loss* (Perda Esperada) e *VaR* (Value at Risk) da carteira simulada.
+
 ## 🚀 Como Executar (Localmente)
 
 Este projeto utiliza ferramentas modernas. Certifique-se de ter o [uv](https://docs.astral.sh/uv/) instalado.
 
 1.  **Clone o repositório:**
     ```bash
-    git clone https://github.com/SEU_USUARIO/agro-risk-engine.git
+    git clone https://github.com/raphaelsoaresc/agro-risk-engine.git
     cd agro-risk-engine
     ```
 
@@ -90,8 +111,13 @@ Este projeto utiliza ferramentas modernas. Certifique-se de ter o [uv](https://d
     > **Nota:** O sistema possui *fallbacks* para dados sintéticos caso as chaves de API (Supabase/WeatherAPI) não estejam presentes, permitindo a execução da demo.
 
 3.  **Instalação de Dependências:**
+    Utilizando o `pyproject.toml` para gerenciar o ambiente:
     ```bash
-    uv pip install -r requirements.txt
+    # Instala o projeto em modo editável
+    uv pip install -e .
+    
+    # Ou para incluir ferramentas de dev (testes/linting):
+    uv pip install -e ".[dev]"
     ```
 
 4.  **Seed de Dados (Simulação):**

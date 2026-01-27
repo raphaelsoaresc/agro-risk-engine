@@ -1,6 +1,5 @@
 name: Agro Risk Engine CI
 
-# Dispara em todo push ou PR para a main
 on:
   push:
     branches: [ "main" ]
@@ -12,25 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    # 1. Baixa o código
     - uses: actions/checkout@v4
     
-    # 2. Instala o uv (Gerenciador de pacotes ultra-rápido)
     - name: Install uv
       uses: astral-sh/setup-uv@v1
       
-    # 3. Configura Python
     - name: Set up Python 3.10
       run: uv python install 3.10
       
-    # 4. Instala dependências
+    # --- MUDANÇA AQUI ---
     - name: Install Dependencies
-      run: uv pip install -r requirements.txt
+      # Instala dependências do pyproject.toml + dependências opcionais de 'dev' (pytest)
+      run: uv pip install -e ".[dev]"
       
-    # 5. Instala ferramenta de teste
-    - name: Install Pytest
-      run: uv pip install pytest
-      
-    # 6. Roda os testes (Se falhar aqui, o GitHub avisa)
     - name: Run Unit Tests
-      run: PYTHONPATH=. uv run pytest
+      run: uv run pytest
