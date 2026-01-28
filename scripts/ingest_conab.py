@@ -13,7 +13,7 @@ class ConabExactIngestor:
     Correção v2: Ajuste de magnitude decimal e Sanity Check.
     """
 
-    TARGET_STATES = ["MT", "PR", "GO", "RS", "MS", "BA", "TO"]
+    TARGET_STATES = ["MT", "PR"]
     TARGET_COL_NAME = "2023/24" 
 
     def __init__(self, file_path: str):
