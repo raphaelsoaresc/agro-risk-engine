@@ -5,7 +5,7 @@ description = "Motor de Modelagem de Risco de Crédito Agrícola (Enterprise Cor
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    { name = "Seu Nome", email = "seu.email@exemplo.com" }
+    { name = "Raphael Soares"}
 ]
 license = { text = "MIT" }
 
