@@ -39,3 +39,29 @@ class ParanaStrategy(BaseRiskStrategy):
         if vol > 0.30: market_score += 30 # Alta volatilidade
         
         return self.sanitize_score(market_score)
+
+    def calculate_geopolitical_risk(self, active_alerts: list) -> float:
+        """
+        PR has better logistics and strong cooperatives, so:
+        1. Lower impact from strikes (half of MT's weight)
+        2. Sensitive to global extreme climate (affects commodity prices)
+        """
+        penalty = 0.0
+        
+        for alert in active_alerts:
+            cat = alert.get('category', '')
+            level = alert.get('risk_level', 'NEUTRO')
+            
+            # Weight 1: Logistics (Lower impact than MT)
+            if cat == 'GREVES_BR':
+                if level == 'CRÍTICO':
+                    penalty += 10.0  # Half of MT's weight
+                elif level == 'ALERTA':
+                    penalty += 5.0
+            
+            # Weight 2: Global Extreme Climate (Affects commodity prices)
+            if cat == 'CLIMA_EXTREMO':
+                if level == 'CRÍTICO':
+                    penalty += 10.0
+
+        return min(penalty, 30.0)

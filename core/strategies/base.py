@@ -65,6 +65,14 @@ class BaseRiskStrategy(ABC):
     def calculate_market_risk(self, df_market: pd.DataFrame) -> float:
         pass
 
+    @abstractmethod
+    def calculate_geopolitical_risk(self, active_alerts: list) -> float:
+        """
+        Calcula o impacto geopolítico baseado nos alertas ativos.
+        Retorna um score de 0 a 100 (Penalidade).
+        """
+        pass
+
     def get_soy_brl_price(self, df_market: pd.DataFrame) -> float:
         """
         Retorna o preço da saca de 60kg em BRL.

@@ -72,3 +72,32 @@ class MatoGrossoStrategy(BaseRiskStrategy):
             market_score += 30 # High volatility
         
         return self.sanitize_score(market_score)
+
+    def calculate_geopolitical_risk(self, active_alerts: list) -> float:
+        """
+        MT is highly sensitive to:
+        1. Logistics (strikes, transport) - 100% dependent on long-haul routes
+        2. War/Sanctions - Direct impact on fertilizer costs (imports)
+        """
+        penalty = 0.0
+        
+        for alert in active_alerts:
+            cat = alert.get('category', '')
+            level = alert.get('risk_level', 'NEUTRO')
+            
+            # Weight 1: Logistics (MT depends 100% on long-distance transport)
+            if cat == 'GREVES_BR' or cat == 'LOGISTICA_GLOBAL':
+                if level == 'CRÍTICO':
+                    penalty += 20.0
+                elif level == 'ALERTA':
+                    penalty += 10.0
+            
+            # Weight 2: War/Sanctions (Direct impact on fertilizer costs)
+            if cat == 'GUERRA_SANCOES':
+                if level == 'CRÍTICO':
+                    penalty += 15.0
+                elif level == 'ALERTA':
+                    penalty += 5.0
+
+        # Cap penalty to avoid breaking the score alone
+        return min(penalty, 40.0)
