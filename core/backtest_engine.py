@@ -59,6 +59,10 @@ class InstitutionalBacktestEngine:
             pit_market = full_market.loc[:current_date]
             df_snapshot_climate = self._build_climate_snapshot(contracts, climate_map, current_date)
 
+            # --- NOVO: Busca notícias da época ---
+            historical_alerts = self._get_historical_alerts(current_date)
+            # -------------------------------------
+
             snapshot_results = []
 
             for contract in contracts:
@@ -68,7 +72,8 @@ class InstitutionalBacktestEngine:
                         contract['client_name'],
                         df_snapshot_climate, 
                         contract,
-                        current_date.month
+                        current_date.month,
+                        active_alerts=historical_alerts # <--- Passa aqui!
                     )
 
                     # --- CORREÇÃO XAI: GERAÇÃO DA NARRATIVA ---
@@ -192,3 +197,23 @@ class InstitutionalBacktestEngine:
             self.db.client.table("backtest_results").insert(data).execute()
         except Exception:
             pass
+
+    def _get_historical_alerts(self, sim_date):
+        """
+        Busca alertas que aconteceram nos 30 dias anteriores à data da simulação.
+        Simula o 'News Flow' da época.
+        """
+        # Janela de relevância: Notícia importa por 30 dias
+        start_window = (sim_date - timedelta(days=30)).strftime('%Y-%m-%d')
+        end_window = sim_date.strftime('%Y-%m-%d')
+        
+        try:
+            res = self.db.client.table("geopolitical_alerts")\
+                .select("*")\
+                .gte("created_at", start_window)\
+                .lte("created_at", end_window)\
+                .in_("risk_level", ["CRÍTICO", "ALERTA"])\
+                .execute()
+            return res.data if res.data else []
+        except Exception:
+            return []

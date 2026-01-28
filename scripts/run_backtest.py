@@ -105,9 +105,16 @@ def _print_institutional_report(db, tag, real_exposure):
         print("█" * 60 + "\n")
 
 if __name__ == "__main__":
-    # Uso via CLI para integração com pipelines de CI/CD
     parser = argparse.ArgumentParser(description="Agro Risk Institutional Backtest")
-    parser.add_argument("--tag", required=True, help="Simulation Tag gerada pelo generate_stress_portfolio.py")
+    
+    # --- ALTERAÇÃO AQUI ---
+    # Removemos required=True e adicionamos default="DEV_TEST_DATASET"
+    parser.add_argument(
+        "--tag", 
+        default="DEV_TEST_DATASET", 
+        help="Simulation Tag (Default: DEV_TEST_DATASET gerado pelo seed)"
+    )
+    
     args = parser.parse_args()
 
     asyncio.run(execute_institutional_backtest(args.tag))
