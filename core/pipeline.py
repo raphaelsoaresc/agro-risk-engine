@@ -50,6 +50,19 @@ class RiskPipeline:
     def run(self):
         logger.info(f"🚀 Iniciando Credit Risk Pipeline")
         
+        # 1. Busca Alertas Ativos (Cache em Memória)
+        # Isso evita fazer 1000 queries se tiver 1000 contratos
+        self.active_alerts = []
+        try:
+            res = self.db.client.table("geopolitical_alerts")\
+                .select("*")\
+                .eq("is_active", True)\
+                .execute()
+            self.active_alerts = res.data if res.data else []
+            logger.info(f"🌍 Alertas Geopolíticos Ativos: {len(self.active_alerts)}")
+        except Exception as e:
+            logger.error(f"⚠️ Erro ao buscar alertas geopolíticos: {e}")
+        
         # --- CORREÇÃO: Executar o Scout antes de processar contratos ---
         # Como o fetch_and_store é async, e o run é sync, precisamos rodar via asyncio.run
         # ou transformar o run em async. Para manter simples aqui:
@@ -156,7 +169,8 @@ class RiskPipeline:
                     contract['name'], 
                     self.df_climate, 
                     contract, 
-                    current_month
+                    current_month,
+                    active_alerts=self.active_alerts # <--- PASSANDO ALERTAS AQUI
                 )
                 
                 metrics['market_price_brl'] = current_price_brl

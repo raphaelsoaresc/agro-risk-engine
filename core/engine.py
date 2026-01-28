@@ -1,19 +1,19 @@
 import pandas as pd
 import numpy as np
+import math
 from datetime import datetime
 from core.indicators.technical import TechnicalIndicators as Tech
 from core.indicators.fundamental import FundamentalIndicators as Fund
 from core.indicators.macro import MacroIndicators as Macro
-from core.seasonality import SeasonalityManager # Importa a inteligência existente
+from core.seasonality import SeasonalityManager
 import logging
 
 logger = logging.getLogger(__name__)
 
 class RiskEngine:
     def __init__(self):
-        # Inicializa o gestor de sazonalidade por Estado
         from core.seasonality import SeasonalityManager
-        self.seasonality = SeasonalityManager() # Instancia o gestor de safras
+        self.seasonality = SeasonalityManager()
 
     def _sanitize_metrics(self, data):
         if isinstance(data, dict): return {k: self._sanitize_metrics(v) for k, v in data.items()}
@@ -178,64 +178,91 @@ class RiskEngine:
             logger.error(f"Error calculating crush margin: {e}")
             return 0.0
 
-    def calculate_pd_metrics(self, df_market, loc_name, df_climate, contract_data, month):
+    def _sigmoid(self, x: float, midpoint: float = 50.0, steepness: float = 0.1) -> float:
         """
-        Calcula a Probabilidade de Default (PD) com Regra de Veto Climático.
+        Aplica transformação logística (sigmoid) para converter score bruto em PD estatística.
+        
+        Args:
+            x: Score bruto (0-100+)
+            midpoint: Ponto de inflexão (50 = PD de 50%)
+            steepness: Controla a inclinação da curva (0.1 = suave)
+        
+        Returns:
+            PD entre 0 e 100%
         """
-        # 1. Risco Produtivo (Safra)
+        try:
+            return 100 / (1 + math.exp(-steepness * (x - midpoint)))
+        except OverflowError:
+            return 100.0 if x > midpoint else 0.0
+
+    def calculate_pd_metrics(self, df_market, loc_name, df_climate, contract_data, month, active_alerts=[]):
+        """
+        Calcula a Probabilidade de Default (PD) com Regra de Veto Climático, Risco Geopolítico e Sigmoid.
+        """
+        # 1. Instancia a estratégia correta para esse contrato
+        from core.factory import RegionalEngineFactory
+        strategy = RegionalEngineFactory.get_strategy(contract_data)
+
+        # 2. Calcula o Risco Geopolítico Específico da Região
+        geo_penalty = strategy.calculate_geopolitical_risk(active_alerts)
+
+        # 3. Risco Produtivo (Safra)
         raw_scores, metrics = self.calculate_full_analysis(df_market, loc_name, df_climate, month)
         
-        # Pesos Base: Clima (40%) + Logística (30%) + Mercado (20%) + Câmbio (10%)
-        productive_pd = (
-            (raw_scores.get('Clima', 0) * 0.4) +
-            (raw_scores.get('Logística', 0) * 0.3) +
-            (raw_scores.get('Mercado', 0) * 0.2) +
-            (raw_scores.get('Câmbio', 0) * 0.1)
+        # Pesos Base: Clima (45%) + Logística (25%) + Mercado (20%) + Câmbio (10%)
+        productive_score = (
+            (raw_scores.get('Clima', 0) * 0.45) +
+            (raw_scores.get('Logística', 0) * 0.25) +
+            (raw_scores.get('Mercado', 0) * 0.20) +
+            (raw_scores.get('Câmbio', 0) * 0.10)
         )
         
-        # 2. Risco Comportamental
+        # --- APLICAÇÃO DA PENALIDADE GEOPOLÍTICA ---
+        productive_score_with_geo = productive_score + geo_penalty
+        
+        # 4. Risco Comportamental
         serasa = contract_data.get('credit_score_serasa', 700)
         dti = contract_data.get('debt_to_income_ratio', 0.3)
         
-        # Normaliza Serasa (0 a 1000 -> Risco 100 a 0)
-        behavioral_risk = (1000 - serasa) / 10 
-        # Penaliza DTI alto (se DTI > 0.5, adiciona risco exponencial)
+        behavioral_score = (1000 - serasa) / 10
         if dti > 0.5:
-            behavioral_risk += (dti * 40) # Penalidade agressiva por alavancagem
+            behavioral_score += (dti * 40)
         
-        # 3. PD FINAL (Híbrida com GATILHO DE CATAÁSTROFE)
-        
+        # 5. Score Híbrido com Veto Climático
         climate_score = raw_scores.get('Clima', 0)
         
-        # --- AQUI ESTÁ A MUDANÇA (REGRA DE VETO) ---
         if climate_score > 80:
-            # Se o clima destruiu a safra, o comportamento importa pouco (10%)
-            # O risco produtivo domina (90%) e ganha um boost de severidade
-            final_pd = (productive_pd * 0.9) + (behavioral_risk * 0.1)
-            final_pd = final_pd * 1.2 # Boost de Pânico
+            # Catástrofe climática: risco produtivo domina
+            final_raw_score = max(productive_score_with_geo, 90)
+            combined_score = (final_raw_score * 0.9) + (behavioral_score * 0.1)
+            combined_score = combined_score * 1.2  # Boost de pânico
         elif climate_score > 50:
-            # Situação de Alerta
-            final_pd = (productive_pd * 0.7) + (behavioral_risk * 0.3)
+            # Alerta moderado
+            combined_score = (productive_score_with_geo * 0.7) + (behavioral_score * 0.3)
         else:
-            # Situação Normal (Comportamento do cliente pesa mais)
-            final_pd = (productive_pd * 0.4) + (behavioral_risk * 0.6)
-            
-        # Teto de 99.9%
-        final_pd = min(final_pd, 99.9)
+            # Situação normal: comportamento pesa mais
+            combined_score = (productive_score_with_geo * 0.4) + (behavioral_score * 0.6)
         
-        # --- FIM DA MUDANÇA ---
+        # 6. APLICAÇÃO DA SIGMOID PARA PD ESTATÍSTICA
+        # Transforma o score combinado (0-150+) em PD probabilística (0-100%)
+        # midpoint=65: Significa que até score 65, o PD é baixo. Passou disso, explode.
+        final_pd = self._sigmoid(combined_score, midpoint=65.0, steepness=0.15)
+        final_pd = min(final_pd, 99.9)  # Teto técnico
 
         # Cálculo de LTV Estressado
         current_price_brl = metrics.get('market_price_brl', 120.0)
         
         credit_metrics = self._calculate_ltv_exposure(
             contract_data, 
-            climate_score, # Passa o score climático puro para o LTV
+            climate_score,
             current_price_brl,
             month
         )
         
         metrics.update(credit_metrics)
+        metrics['geopolitical_penalty'] = geo_penalty
+        metrics['raw_combined_score'] = round(combined_score, 2)  # Debug info
+        
         return round(final_pd, 2), metrics
 
     def _calculate_dynamic_lgd(self, exposure, collateral_value):
