@@ -7,7 +7,9 @@
 
 **Motor de Modelagem de Risco de Crédito Agrícola (Credit Risk Engine) de alta performance.**
 
-> **Contexto:** Este repositório contém o *core backend* de uma plataforma DaaS (Data-as-a-Service) desenvolvida originalmente para fins comerciais. O código foi aberto (Open Sourced) para demonstrar arquitetura de software robusta, engenharia de dados avançada e modelagem quantitativa aplicada ao agronegócio.
+> **Nota de Desenvolvimento:** Este projeto é um estudo avançado de **Arquitetura de Software** (Modular Monolith) e **Design Patterns** (Strategy, Factory, Singleton).
+>
+> Ele foi desenvolvido como um protótipo de alta complexidade com **assistência de ferramentas de IA** para acelerar a implementação de conceitos arquiteturais. O objetivo deste repositório é demonstrar visão sistêmica e capacidade de estruturar soluções robustas.
 
 ## 🎯 O Problema de Negócio
 
